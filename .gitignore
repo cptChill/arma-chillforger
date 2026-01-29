@@ -1,0 +1,7 @@
+*.bin
+*.meta
+/Internal/
+/.internal/
+/logs/
+*.dep
+.vscode/

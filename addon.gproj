@@ -1,0 +1,8 @@
+GameProject {
+ ID "Ammoscanner"
+ GUID "687B3A9EEA2DE712"
+ TITLE "Ammoscanner"
+ Dependencies {
+  "58D0FB3206B6F859"
+ }
+}
