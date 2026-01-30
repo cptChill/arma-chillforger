@@ -1,44 +1,51 @@
-void ScanForRelevantAmmo()
+class MyAmmoScannerLogic
 {
-    // 1. Get the player and their current weapon
-    IEntity player = GetGame().GetPlayerController().GetControlledEntity();
-    if (!player) return;
-
-    CharacterControllerComponent charCtrl = CharacterControllerComponent.Cast(player.FindComponent(CharacterControllerComponent));
-    BaseWeaponManagerComponent weaponMgr = BaseWeaponManagerComponent.Cast(player.FindComponent(BaseWeaponManagerComponent));
-    
-    if (!weaponMgr) return;
-    
-    // Get the currently selected weapon
-    WeaponComponent currentWeapon = weaponMgr.GetCurrentWeapon();
-    if (!currentWeapon) return;
-
-    // Get the class name of the magazine this weapon needs
-    // This is the "Key" we use to find matching items on the ground
-    string requiredMagClassName = currentWeapon.GetDefaultMagazinePrefabName();
-
-    string report = "Scanning for: " + requiredMagClassName + "\n";
-    bool foundMatch = false;
-
-    // 2. Spatial Query (10m radius)
-    GetGame().GetWorld().QueryEntitiesBySphere(player.GetOrigin(), 10.0,  void(IEntity ent)
+    static void ScanForRelevantAmmo()
     {
-        // Check if the item is a magazine
-        MagazineComponent magComp = MagazineComponent.Cast(ent.FindComponent(MagazineComponent));
-        if (magComp)
+        IEntity player = GetGame().GetPlayerController().GetControlledEntity();
+        if (!player) return;
+
+        BaseWeaponManagerComponent weaponMgr = BaseWeaponManagerComponent.Cast(player.FindComponent(BaseWeaponManagerComponent));
+        if (!weaponMgr) return;
+        
+        WeaponComponent currentWeapon = weaponMgr.GetCurrentWeapon();
+        if (!currentWeapon) return;
+
+        // Get the magazine well to see what we CAN fit, not just the default
+        // Or stick to currentWeapon.GetDefaultMagazinePrefabName() for simplicity
+        ResourceName requiredMagResource = currentWeapon.GetDefaultMagazinePrefabName();
+        if (requiredMagResource.IsEmpty()) return;
+
+        string report = "Scanning for: " + requiredMagResource + "\n";
+        int foundCount = 0;
+
+        // Use a wider flag set to catch items in more states
+        EQueryEntitiesFlags flags = EQueryEntitiesFlags.DYNAMIC | EQueryEntitiesFlags.ALL;
+
+        GetGame().GetWorld().QueryEntitiesBySphere(player.GetOrigin(), 10.0,  bool(IEntity ent)
         {
-            // Does this ammo match our gun?
-            if (ent.GetPrefabData().GetPrefabName() == requiredMagClassName)
+            // Ignore the player themselves
+            if (ent == player) return true;
+
+            MagazineComponent magComp = MagazineComponent.Cast(ent.FindComponent(MagazineComponent));
+            if (magComp)
             {
-                foundMatch = true;
-                report += "[MATCH] Found at: " + ent.GetOrigin().ToString() + "\n";
+                // Compare ResourceNames directly
+                if (ent.GetPrefabData().GetPrefabName() == requiredMagResource)
+                {
+                    foundCount++;
+                    vector pos = ent.GetOrigin();
+                    report += string.Format("- Found at %1, %2\n", pos[0].ToString(), pos[2].ToString());
+                }
             }
-        }
-        return true;
-    }, null, EQueryEntitiesFlags.DYNAMIC);
+            return true;
+        }, null, flags);
 
-    if (!foundMatch) report += "No matching ammo nearby.";
+        if (foundCount == 0) 
+            report += "No matching ammo nearby.";
+        else
+            report = string.Format("Found %1 matches:\n", foundCount) + report;
 
-    // 3. Popup result
-    SCR_HintManagerComponent.GetInstance().ShowCustomHint(report, "Ammo Scanner", 7.0);
+        SCR_HintManagerComponent.ShowCustomHint(report, "Ammo Scanner", 7.0);
+    }
 }
